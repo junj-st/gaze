@@ -151,4 +151,4 @@ Built with amazing Go libraries from [Charm](https://charm.sh/) and inspired by 
 
 ---
 
-**made by [junjiang](https://github.com/junjiang)**
+**made by [jun jiang](https://github.com/junj-st)**
