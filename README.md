@@ -132,7 +132,7 @@ Monitoring 4 ports • Last scan: 1s ago
 ```
 
 
-## 📝 Roadmap
+##  Roadmap
 
 - [ ] Health checking with HTTP ping and latency measurement
 - [ ] Port filtering and search functionality
