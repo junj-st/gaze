@@ -1,19 +1,19 @@
-# 🔍 Gaze
+#  Gaze
 
 > A beautiful Terminal UI for monitoring and managing local development ports
 
 Gaze is a real-time dashboard for your local development environment. It solves the everyday annoyance of hung ports, ghost processes, and "address already in use" errors by giving you instant visibility and control over your local network sockets—all without leaving your terminal.
 
-## ✨ Features
+##  Features
 
-- 🚀 **Auto-Discovery**: Continuously scans your local ports to detect active connections
-- 🔍 **Process Identification**: Maps each port to its process name and PID
-- ⚡ **Kill Switch**: Terminate hung processes with a single keystroke
-- 🎨 **Beautiful UI**: Modern terminal interface with colors and smooth interactions
-- ⏱️ **Real-time Updates**: Auto-refreshes every 3 seconds to keep you in sync
-- 💻 **Cross-Platform**: Works on macOS, Linux, and Windows
+-  **Auto-Discovery**: Continuously scans your local ports to detect active connections
+-  **Process Identification**: Maps each port to its process name and PID
+-  **Kill Switch**: Terminate hung processes with a single keystroke
+-  **Beautiful UI**: Modern terminal interface with colors and smooth interactions
+-  **Real-time Updates**: Auto-refreshes every 3 seconds to keep you in sync
+-  **Cross-Platform**: Works on macOS, Linux, and Windows
 
-## 🎯 Why Gaze?
+##  Why Gaze?
 
 Ever encountered this?
 ```
@@ -22,7 +22,7 @@ Error: listen EADDRINUSE: address already in use :::3000
 
 Instead of hunting through terminal windows or running complex `lsof` commands, just launch Gaze. See all your active ports at a glance and kill the culprit with a single key press.
 
-## 📦 Installation
+##  Installation
 
 ### Prerequisites
 
@@ -51,7 +51,7 @@ make build
 go install github.com/junjiang/gaze/cmd/gaze@latest
 ```
 
-## 🎮 Usage
+## Usage
 
 Simply run:
 ```bash
@@ -67,7 +67,7 @@ gaze
 | `r` | Manual refresh |
 | `q` or `Esc` | Quit |
 
-## 🏗️ Architecture
+## Architecture
 
 Gaze follows clean architecture principles:
 
@@ -90,7 +90,7 @@ gaze/
 - **[Lip Gloss](https://github.com/charmbracelet/lipgloss)**: Styling and layout for terminal UIs
 - **[gopsutil](https://github.com/shirou/gopsutil)**: Cross-platform library for system information
 
-## 🔧 Development
+##  Development
 
 ### Run in Development Mode
 ```bash
@@ -112,7 +112,7 @@ This creates binaries for:
 make test
 ```
 
-## 🎨 Screenshots
+## Screenshots
 
 ```
 🔍 GAZE - Local Port Monitor
@@ -131,13 +131,6 @@ Monitoring 4 ports • Last scan: 1s ago
 ↑/↓: Navigate • k: Kill Process • r: Refresh • q: Quit
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! This project is structured to be a portfolio piece that demonstrates:
-
-1. **Systems Programming**: Direct OS interaction for socket and process management
-2. **Concurrency**: Background scanning without blocking the UI thread
-3. **Modern UI/UX**: Proof that terminal tools can be beautiful and intuitive
 
 ## 📝 Roadmap
 
@@ -148,14 +141,14 @@ Contributions are welcome! This project is structured to be a portfolio piece th
 - [ ] Docker container detection
 - [ ] Process resource usage (CPU/Memory)
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) for details
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 Built with amazing Go libraries from [Charm](https://charm.sh/) and inspired by modern developer tools like `lazygit` and `k9s`.
 
 ---
 
-**Made with ❤️ by [junjiang](https://github.com/junjiang)**
+**made by [junjiang](https://github.com/junjiang)**

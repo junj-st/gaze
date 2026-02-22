@@ -33,7 +33,7 @@ func ScanPorts() ([]PortInfo, error) {
 		if conn.Laddr.Port != 0 && conn.Status == "LISTEN" {
 			port := int(conn.Laddr.Port)
 
-			// Skip if we already have this port
+			// Skip if already have this port
 			if _, exists := portMap[port]; exists {
 				continue
 			}
@@ -105,7 +105,7 @@ func GetProcessName(pid int32) string {
 // CheckPortHealth sends a basic HTTP request to check if a port is responsive
 func CheckPortHealth(port int) (int, error) {
 	// Simple implementation using curl
-	cmd := exec.Command("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", 
+	cmd := exec.Command("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
 		fmt.Sprintf("http://localhost:%d", port), "--connect-timeout", "1")
 	output, err := cmd.Output()
 	if err != nil {
