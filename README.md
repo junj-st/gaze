@@ -8,6 +8,9 @@ Gaze is a real-time dashboard for your local development environment. It solves 
 
 -  **Auto-Discovery**: Continuously scans your local ports to detect active connections
 -  **Process Identification**: Maps each port to its process name and PID
+-  **Port History Tracking**: Tracks when ports open/close and shows uptime for each active port
+-  **History View**: Browse complete port lifecycle with timestamps and event history
+-  **Export Functionality**: Export port snapshots to JSON and CSV for auditing or sharing
 -  **Flexible Sorting**: Sort by Port, PID, or Process name with ascending/descending order
 -  **Kill Switch**: Terminate hung processes with a single keystroke
 -  **Beautiful UI**: Modern terminal interface with colors and smooth interactions
@@ -66,6 +69,8 @@ gaze
 | `↑/↓` | Navigate through ports |
 | `s` | Cycle sort column (Port → PID → Process) |
 | `a` | Toggle sort order (ascending ↔ descending) |
+| `e` | Export current snapshot to JSON & CSV |
+| `h` | Toggle history view |
 | `k` | Kill the selected process |
 | `r` | Manual refresh |
 | `q` or `Esc` | Quit |
@@ -117,32 +122,48 @@ make test
 
 ## Screenshots
 
+### Main View (with Uptime)
 ```
 🔍 GAZE - Local Port Monitor
 
-┌──────────────────────────────────────────────────────────────┐
-│ Port       PID        Process                 Status         │
-├──────────────────────────────────────────────────────────────┤
-│ 3000       12345      node                    LISTEN         │
-│ 5432       23456      postgres                LISTEN         │
-│ 6379       34567      redis-server            LISTEN         │
-│ 8080       45678      docker-proxy            LISTEN         │
-└──────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Port       PID        Process              Uptime          Status         │
+├───────────────────────────────────────────────────────────────────────────┤
+│ 3000       12345      node                 2h 15m 32s      LISTEN         │
+│ 5432       23456      postgres             5d 3h 12m       LISTEN         │
+│ 6379       34567      redis-server         1d 18h 45m      LISTEN         │
+│ 8080       45678      docker-proxy         45m 12s         LISTEN         │
+└───────────────────────────────────────────────────────────────────────────┘
 
 Monitoring 4 ports • Last scan: 1s ago
+Sorted by: Port ↑
 
-↑/↓: Navigate • k: Kill Process • r: Refresh • q: Quit
+↑/↓: Navigate • s: Sort • a: Order • e: Export • h: History • k: Kill • r: Refresh • q: Quit
 ```
 
+### History View (press `h`)
+```
+GAZE - Port History
 
-##  Roadmap
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Port   Process              Status   First Seen   Last Seen    Uptime     │
+├───────────────────────────────────────────────────────────────────────────┤
+│ 3000   node                 ACTIVE   14:23:10     16:38:42     2h 15m 32s │
+│ 8000   python3              CLOSED   14:00:00     14:15:30     -          │
+│ 5432   postgres             ACTIVE   12:00:00     16:38:42     4h 38m 42s │
+│ 9000   java                 CLOSED   13:45:12     15:20:00     -          │
+└───────────────────────────────────────────────────────────────────────────┘
 
-- [ ] Health checking with HTTP ping and latency measurement
-- [ ] Port filtering and search functionality
-- [ ] Configuration file for custom port lists
-- [ ] Export port snapshots to JSON/CSV
-- [ ] Docker container detection
-- [ ] Process resource usage (CPU/Memory)
+Tracked: 15 ports • Active: 4 • Events: 32
+
+↑/↓: Navigate • h: Back to Ports • e: Export • q: Quit
+```
+
+### Export Feature (press `e`)
+Exports are saved to your home directory:
+- `gaze-export-2026-02-22-16-38-42.json` - Full snapshot with statistics
+- `gaze-export-2026-02-22-16-38-42.csv` - Spreadsheet-friendly format
+
 
 ## License
 
