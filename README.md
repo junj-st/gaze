@@ -32,7 +32,7 @@ Instead of hunting through terminal windows or running complex `lsof` commands, 
 
 ```bash
 # Clone the repository
-git clone https://github.com/junjiang/gaze.git
+git clone https://github.com/junj-st/gaze.git
 cd gaze
 
 # Install dependencies
@@ -48,7 +48,7 @@ make build
 ### Quick Install
 
 ```bash
-go install github.com/junjiang/gaze/cmd/gaze@latest
+go install github.com/junj-st/gaze/cmd/gaze@latest
 ```
 
 ## Usage
