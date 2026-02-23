@@ -55,14 +55,25 @@ type tickMsg time.Time
 type scanResultMsg []scanner.PortInfo
 type errorMsg struct{ err error }
 
+// SortColumn represents which column to sort by
+type SortColumn int
+
+const (
+	SortByPort SortColumn = iota
+	SortByPID
+	SortByProcess
+)
+
 // Model represents the application state
 type Model struct {
-	ports      []scanner.PortInfo
-	cursor     int
-	table      table.Model
-	err        error
-	lastScan   time.Time
-	isScanning bool
+	ports        []scanner.PortInfo
+	cursor       int
+	table        table.Model
+	err          error
+	lastScan     time.Time
+	isScanning   bool
+	sortColumn   SortColumn
+	sortAscending bool
 }
 
 // InitialModel creates the initial model
@@ -97,9 +108,11 @@ func InitialModel() Model {
 	t.SetStyles(s)
 
 	return Model{
-		ports:    []scanner.PortInfo{},
-		table:    t,
-		lastScan: time.Now(),
+		ports:         []scanner.PortInfo{},
+		table:         t,
+		lastScan:      time.Now(),
+		sortColumn:    SortByPort,
+		sortAscending: true,
 	}
 }
 
@@ -138,6 +151,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r", "R":
 			// Manual refresh
 			return m, scanPorts()
+
+		case "s", "S":
+			// Cycle through sort columns
+			m.sortColumn = (m.sortColumn + 1) % 3
+			m.sortPorts()
+			m.updateTableRows()
+
+		case "a", "A":
+			// Toggle sort order
+			m.sortAscending = !m.sortAscending
+			m.sortPorts()
+			m.updateTableRows()
 		}
 
 	case tickMsg:
@@ -153,22 +178,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isScanning = false
 		m.err = nil
 
-		// Sort ports by port number
-		sort.Slice(m.ports, func(i, j int) bool {
-			return m.ports[i].Port < m.ports[j].Port
-		})
-
-		// Update table rows
-		rows := []table.Row{}
-		for _, p := range m.ports {
-			rows = append(rows, table.Row{
-				fmt.Sprintf("%d", p.Port),
-				fmt.Sprintf("%d", p.PID),
-				p.Process,
-				p.Status,
-			})
-		}
-		m.table.SetRows(rows)
+		// Sort and update table
+		m.sortPorts()
+		m.updateTableRows()
 
 	case errorMsg:
 		m.err = msg.err
@@ -209,8 +221,12 @@ func (m Model) View() string {
 		s += errorStyle.Render(fmt.Sprintf("Error: %v", m.err)) + "\n"
 	}
 
+	// Sort indicator
+	sortInfo := m.getSortIndicator()
+	s += lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(sortInfo) + "\n"
+
 	// Help text
-	help := "↑/↓: Navigate • k: Kill Process • r: Refresh • q: Quit"
+	help := "↑/↓: Navigate • s: Sort Column • a: Sort Order • k: Kill • r: Refresh • q: Quit"
 	s += helpStyle.Render(help)
 
 	return s
@@ -232,4 +248,57 @@ func scanPorts() tea.Cmd {
 		}
 		return scanResultMsg(ports)
 	}
+}
+
+// sortPorts sorts the ports based on current sort settings
+func (m *Model) sortPorts() {
+	sort.Slice(m.ports, func(i, j int) bool {
+		var less bool
+		switch m.sortColumn {
+		case SortByPort:
+			less = m.ports[i].Port < m.ports[j].Port
+		case SortByPID:
+			less = m.ports[i].PID < m.ports[j].PID
+		case SortByProcess:
+			less = m.ports[i].Process < m.ports[j].Process
+		}
+		if !m.sortAscending {
+			return !less
+		}
+		return less
+	})
+}
+
+// updateTableRows updates the table with current port data
+func (m *Model) updateTableRows() {
+	rows := []table.Row{}
+	for _, p := range m.ports {
+		rows = append(rows, table.Row{
+			fmt.Sprintf("%d", p.Port),
+			fmt.Sprintf("%d", p.PID),
+			p.Process,
+			p.Status,
+		})
+	}
+	m.table.SetRows(rows)
+}
+
+// getSortIndicator returns a string showing the current sort state
+func (m Model) getSortIndicator() string {
+	var column string
+	switch m.sortColumn {
+	case SortByPort:
+		column = "Port"
+	case SortByPID:
+		column = "PID"
+	case SortByProcess:
+		column = "Process"
+	}
+
+	direction := "↑"
+	if !m.sortAscending {
+		direction = "↓"
+	}
+
+	return fmt.Sprintf("Sorted by: %s %s", column, direction)
 }

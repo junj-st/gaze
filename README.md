@@ -8,6 +8,7 @@ Gaze is a real-time dashboard for your local development environment. It solves 
 
 -  **Auto-Discovery**: Continuously scans your local ports to detect active connections
 -  **Process Identification**: Maps each port to its process name and PID
+-  **Flexible Sorting**: Sort by Port, PID, or Process name with ascending/descending order
 -  **Kill Switch**: Terminate hung processes with a single keystroke
 -  **Beautiful UI**: Modern terminal interface with colors and smooth interactions
 -  **Real-time Updates**: Auto-refreshes every 3 seconds to keep you in sync
@@ -63,6 +64,8 @@ gaze
 | Key | Action |
 |-----|--------|
 | `↑/↓` | Navigate through ports |
+| `s` | Cycle sort column (Port → PID → Process) |
+| `a` | Toggle sort order (ascending ↔ descending) |
 | `k` | Kill the selected process |
 | `r` | Manual refresh |
 | `q` or `Esc` | Quit |
