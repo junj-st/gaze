@@ -247,8 +247,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				// Single process kill
-				if len(m.ports) > 0 && m.table.Cursor() < len(m.ports) {
-					selectedPort := m.ports[m.table.Cursor()]
+				cursor := m.table.Cursor()
+				if len(m.ports) > 0 && cursor >= 0 && cursor < len(m.ports) {
+					selectedPort := m.ports[cursor]
 					if selectedPort.PID != 0 {
 						err := scanner.KillProcess(selectedPort.PID)
 						if err != nil {
@@ -263,9 +264,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case " ":
 			// Toggle selection for current port (multi-select mode)
-			if m.viewMode == ViewPorts && len(m.ports) > 0 && m.table.Cursor() < len(m.ports) {
+			cursor := m.table.Cursor()
+			if m.viewMode == ViewPorts && len(m.ports) > 0 && cursor >= 0 && cursor < len(m.ports) {
 				m.multiSelectMode = true
-				m.ports[m.table.Cursor()].Selected = !m.ports[m.table.Cursor()].Selected
+				m.ports[cursor].Selected = !m.ports[cursor].Selected
 				m.updateTableRows()
 			}
 
@@ -317,7 +319,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case scanResultMsg:
-		m.ports = []scanner.PortInfo(msg)
+		// Preserve selections across refreshes
+		selectedPorts := make(map[int]bool)
+		for _, p := range m.ports {
+			if p.Selected {
+				selectedPorts[p.Port] = true
+			}
+		}
+
+		newPorts := []scanner.PortInfo(msg)
+		// Restore selections
+		for i := range newPorts {
+			if selectedPorts[newPorts[i].Port] {
+				newPorts[i].Selected = true
+			}
+		}
+
+		m.ports = newPorts
 		m.lastScan = time.Now()
 		m.isScanning = false
 		m.err = nil
