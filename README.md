@@ -6,6 +6,7 @@ Gaze is a real-time dashboard for your local development environment. It solves 
 
 ##  Features
 
+### Core Features
 -  **Auto-Discovery**: Continuously scans your local ports to detect active connections
 -  **Process Identification**: Maps each port to its process name and PID
 -  **Port History Tracking**: Tracks when ports open/close and shows uptime for each active port
@@ -16,6 +17,13 @@ Gaze is a real-time dashboard for your local development environment. It solves 
 -  **Beautiful UI**: Modern terminal interface with colors and smooth interactions
 -  **Real-time Updates**: Auto-refreshes every 3 seconds to keep you in sync
 -  **Cross-Platform**: Works on macOS, Linux, and Windows
+
+### New Features (v2.0 - Branch: newversion) 🎉
+-  **HTTP Health Checking**: Automatically pings web ports to check response time and status codes
+-  **Color-Coded Ports**: Visual distinction between well-known (0-1023), registered (1024-49151), and dynamic ports (49152-65535)
+-  **Resource Monitoring**: View CPU % and Memory usage for each process
+-  **Multi-Process Kill**: Select multiple ports with Space and kill them all at once with `k`
+-  **Metrics Toggle**: Press `m` to show/hide CPU and memory metrics
 
 ##  Why Gaze?
 
@@ -64,16 +72,26 @@ gaze
 
 ### Keyboard Controls
 
+#### Main View
 | Key | Action |
 |-----|--------|
 | `↑/↓` | Navigate through ports |
+| `Space` | Toggle selection (multi-select mode) |
+| `m` | Toggle metrics display (CPU/Memory) |
 | `s` | Cycle sort column (Port → PID → Process) |
 | `a` | Toggle sort order (ascending ↔ descending) |
 | `e` | Export current snapshot to JSON & CSV |
 | `h` | Toggle history view |
-| `k` | Kill the selected process |
+| `k` | Kill selected process (or all selected in multi-select) |
 | `r` | Manual refresh |
-| `q` or `Esc` | Quit |
+| `q` | Quit |
+| `Esc` | Cancel multi-select mode / Quit |
+
+#### Multi-Select Mode
+When you press `Space` to select ports, you enter multi-select mode:
+- Press `Space` again on other ports to select/deselect them
+- Press `k` to kill all selected processes at once
+- Press `Esc` to cancel and clear selections
 
 ## Architecture
 
@@ -120,25 +138,63 @@ This creates binaries for:
 make test
 ```
 
-## Screenshots
+##  Screenshots
 
-### Main View (with Uptime)
+### Main View (Standard Mode)
 ```
 🔍 GAZE - Local Port Monitor
 
-┌───────────────────────────────────────────────────────────────────────────┐
-│ Port       PID        Process              Uptime          Status         │
-├───────────────────────────────────────────────────────────────────────────┤
-│ 3000       12345      node                 2h 15m 32s      LISTEN         │
-│ 5432       23456      postgres             5d 3h 12m       LISTEN         │
-│ 6379       34567      redis-server         1d 18h 45m      LISTEN         │
-│ 8080       45678      docker-proxy         45m 12s         LISTEN         │
-└───────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ ✓   Port     PID      Process              HTTP    Uptime        Status       │
+├────────────────────────────────────────────────────────────────────────────────┤
+│     3000     12345    node                 200     2h 15m 32s    LISTEN       │
+│     5432     23456    postgres             -       5d 3h 12m     LISTEN       │
+│     6379     34567    redis-server         -       1d 18h 45m    LISTEN       │
+│     8080     45678    docker-proxy         200     45m 12s       LISTEN       │
+└────────────────────────────────────────────────────────────────────────────────┘
 
 Monitoring 4 ports • Last scan: 1s ago
 Sorted by: Port ↑
 
-↑/↓: Navigate • s: Sort • a: Order • e: Export • h: History • k: Kill • r: Refresh • q: Quit
+↑/↓: Navigate • Space: Select • m: Metrics • s: Sort • e: Export • h: History • k: Kill • q: Quit
+```
+
+### Metrics View (press `m`)
+```
+🔍 GAZE - Local Port Monitor
+
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ ✓  Port   PID     Process          HTTP  Latency   CPU%   Mem(MB)  Uptime            │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│    3000   12345   node             200   12ms      2.5    145.2    2h 15m 32s         │
+│    5432   23456   postgres         -     -         0.3    512.8    5d 3h 12m          │
+│    6379   34567   redis-server     -     -         0.1    28.4     1d 18h 45m         │
+│    8080   45678   docker-proxy     200   8ms       0.8    64.1     45m 12s            │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+
+Monitoring 4 ports • Last scan: 1s ago • Metrics: ON
+Sorted by: Port ↑
+
+↑/↓: Navigate • Space: Select • m: Metrics • s: Sort • e: Export • h: History • k: Kill • q: Quit
+```
+
+### Multi-Select Mode (press `Space`)
+```
+🔍 GAZE - Local Port Monitor
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ ✓   Port     PID      Process              HTTP    Uptime        Status       │
+├────────────────────────────────────────────────────────────────────────────────┤
+│ ✓   3000     12345    node                 200     2h 15m 32s    LISTEN       │
+│     5432     23456    postgres             -       5d 3h 12m     LISTEN       │
+│ ✓   6379     34567    redis-server         -       1d 18h 45m    LISTEN       │
+│     8080     45678    docker-proxy         200     45m 12s       LISTEN       │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+Monitoring 4 ports • Last scan: 1s ago • Selected: 2
+Sorted by: Port ↑
+
+Space: Toggle • k: Kill Selected • Esc: Cancel • q: Quit
 ```
 
 ### History View (press `h`)
@@ -164,6 +220,24 @@ Exports are saved to your home directory:
 - `gaze-export-2026-02-22-16-38-42.json` - Full snapshot with statistics
 - `gaze-export-2026-02-22-16-38-42.csv` - Spreadsheet-friendly format
 
+##  Roadmap
+
+### ✅ Completed (v2.0 - newversion branch)
+- [x] Flexible column sorting by Port/PID/Process
+- [x] Port history tracking with uptime display
+- [x] Export port snapshots to JSON/CSV
+- [x] HTTP health checking with latency measurement
+- [x] Color-coded port types (well-known/registered/dynamic)
+- [x] Resource monitoring (CPU/Memory usage)
+- [x] Multi-process kill selection
+
+### 🚀 Upcoming
+- [ ] Port filtering and search functionality
+- [ ] Configuration file for custom port lists
+- [ ] Docker container detection
+- [ ] Alert system for port changes
+- [ ] Web dashboard mode
+- [ ] Plugin system for extensions
 
 ## License
 
