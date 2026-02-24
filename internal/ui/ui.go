@@ -37,7 +37,7 @@ var (
 			Foreground(lipgloss.Color("#00D9FF"))
 
 	pidStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888888"))
+			Foreground(lipgloss.Color("#888888"))
 
 	processStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#88FF88"))
@@ -67,6 +67,44 @@ var (
 	eventCloseStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FF5555")).
 			Bold(true)
+
+	// Port type colors
+	wellKnownPortStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#FF6B6B")) // Red for system ports
+
+	registeredPortStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#4ECDC4")) // Teal for registered
+
+	dynamicPortStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#95E1D3")) // Light green for dynamic
+
+	// HTTP health colors
+	httpOkStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00FF00")) // Green for 2xx
+
+	httpErrorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF5555")) // Red for errors
+
+	httpWarnStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFD700")) // Yellow for 3xx/4xx
+
+	// Resource monitoring colors
+	lowUsageStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00FF00"))
+
+	mediumUsageStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFD700"))
+
+	highUsageStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF5555"))
+
+	// Multi-select indicator
+	selectedCheckStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#00FF00"))
 )
 
 type tickMsg time.Time
@@ -93,18 +131,20 @@ const (
 
 // Model represents the application state
 type Model struct {
-	ports         []scanner.PortInfo
-	cursor        int
-	table         table.Model
-	err           error
-	lastScan      time.Time
-	isScanning    bool
-	sortColumn    SortColumn
-	sortAscending bool
+	ports          []scanner.PortInfo
+	cursor         int
+	table          table.Model
+	err            error
+	lastScan       time.Time
+	isScanning     bool
+	sortColumn     SortColumn
+	sortAscending  bool
 	historyTracker *history.Tracker
-	viewMode      ViewMode
-	exportMsg     string
-	exportMsgTime time.Time
+	viewMode       ViewMode
+	exportMsg      string
+	exportMsgTime  time.Time
+	showMetrics    bool // Toggle CPU/Memory display
+	multiSelectMode bool // Multi-select mode for killing multiple processes
 }
 
 // InitialModel creates the initial model
@@ -139,13 +179,15 @@ func InitialModel() Model {
 	t.SetStyles(s)
 
 	return Model{
-		ports:          []scanner.PortInfo{},
-		table:          t,
-		lastScan:       time.Now(),
-		sortColumn:     SortByPort,
-		sortAscending:  true,
-		historyTracker: history.NewTracker(1000, 500), // Track last 1000 events, 500 ports
-		viewMode:       ViewPorts,
+		ports:           []scanner.PortInfo{},
+		table:           t,
+		lastScan:        time.Now(),
+		sortColumn:      SortByPort,
+		sortAscending:   true,
+		historyTracker:  history.NewTracker(1000, 500), // Track last 1000 events, 500 ports
+		viewMode:        ViewPorts,
+		showMetrics:     false,
+		multiSelectMode: false,
 	}
 }
 
@@ -164,21 +206,76 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c", "esc":
+		case "q", "ctrl+c":
 			return m, tea.Quit
 
-		case "k", "K":
-			if len(m.ports) > 0 && m.table.Cursor() < len(m.ports) {
-				selectedPort := m.ports[m.table.Cursor()]
-				if selectedPort.PID != 0 {
-					err := scanner.KillProcess(selectedPort.PID)
-					if err != nil {
-						m.err = fmt.Errorf("failed to kill process %d: %w", selectedPort.PID, err)
-					} else {
-						// Immediately rescan after killing
-						return m, scanPorts()
+		case "esc":
+			// Cancel multi-select mode or quit
+			if m.multiSelectMode {
+				m.multiSelectMode = false
+				// Clear all selections
+				for i := range m.ports {
+					m.ports[i].Selected = false
+				}
+				m.updateTableRows()
+			} else {
+				return m, tea.Quit
+			}
+
+		case "k":
+			// Kill single process or all selected
+			if m.multiSelectMode {
+				// Kill all selected processes
+				var pidsToKill []int32
+				for _, p := range m.ports {
+					if p.Selected {
+						pidsToKill = append(pidsToKill, p.PID)
 					}
 				}
+				
+				if len(pidsToKill) > 0 {
+					errors := scanner.KillMultipleProcesses(pidsToKill)
+					if len(errors) > 0 {
+						m.err = fmt.Errorf("failed to kill %d process(es)", len(errors))
+					} else {
+						m.exportMsg = fmt.Sprintf("Killed %d process(es)", len(pidsToKill))
+						m.exportMsgTime = time.Now()
+					}
+					// Exit multi-select mode and rescan
+					m.multiSelectMode = false
+					return m, scanPorts()
+				}
+			} else {
+				// Single process kill
+				cursor := m.table.Cursor()
+				if len(m.ports) > 0 && cursor >= 0 && cursor < len(m.ports) {
+					selectedPort := m.ports[cursor]
+					if selectedPort.PID != 0 {
+						err := scanner.KillProcess(selectedPort.PID)
+						if err != nil {
+							m.err = fmt.Errorf("failed to kill process %d: %w", selectedPort.PID, err)
+						} else {
+							// Immediately rescan after killing
+							return m, scanPorts()
+						}
+					}
+				}
+			}
+
+		case " ":
+			// Toggle selection for current port (multi-select mode)
+			cursor := m.table.Cursor()
+			if m.viewMode == ViewPorts && len(m.ports) > 0 && cursor >= 0 && cursor < len(m.ports) {
+				m.multiSelectMode = true
+				m.ports[cursor].Selected = !m.ports[cursor].Selected
+				m.updateTableRows()
+			}
+
+		case "m", "M":
+			// Toggle metrics display
+			m.showMetrics = !m.showMetrics
+			if m.viewMode == ViewPorts {
+				m.updateTableRows()
 			}
 
 		case "r", "R":
@@ -222,7 +319,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case scanResultMsg:
-		m.ports = []scanner.PortInfo(msg)
+		// Preserve selections across refreshes
+		selectedPorts := make(map[int]bool)
+		for _, p := range m.ports {
+			if p.Selected {
+				selectedPorts[p.Port] = true
+			}
+		}
+
+		newPorts := []scanner.PortInfo(msg)
+		// Restore selections
+		for i := range newPorts {
+			if selectedPorts[newPorts[i].Port] {
+				newPorts[i].Selected = true
+			}
+		}
+
+		m.ports = newPorts
 		m.lastScan = time.Now()
 		m.isScanning = false
 		m.err = nil
@@ -303,13 +416,33 @@ func (m Model) View() string {
 	// Sort indicator (only in ports view)
 	if m.viewMode == ViewPorts {
 		sortInfo := m.getSortIndicator()
-		s += lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(sortInfo) + "\n"
+		modeInfo := ""
+		if m.showMetrics {
+			modeInfo = " • Metrics: ON"
+		}
+		if m.multiSelectMode {
+			selectedCount := 0
+			for _, p := range m.ports {
+				if p.Selected {
+					selectedCount++
+				}
+			}
+			if selectedCount > 0 {
+				modeInfo += fmt.Sprintf(" • Selected: %d", selectedCount)
+			}
+		}
+		s += lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(sortInfo+modeInfo) + "\n"
 	}
 
 	// Help text
 	if m.viewMode == ViewPorts {
-		help := "↑/↓: Navigate • s: Sort • a: Order • e: Export • h: History • k: Kill • r: Refresh • q: Quit"
-		s += helpStyle.Render(help)
+		if m.multiSelectMode {
+			help := "Space: Toggle • k: Kill Selected • Esc: Cancel • q: Quit"
+			s += helpStyle.Render(help)
+		} else {
+			help := "↑/↓: Navigate • Space: Select • m: Metrics • s: Sort • e: Export • h: History • k: Kill • q: Quit"
+			s += helpStyle.Render(help)
+		}
 	} else {
 		help := "↑/↓: Navigate • h: Back to Ports • e: Export • q: Quit"
 		s += helpStyle.Render(help)
@@ -359,27 +492,82 @@ func (m *Model) sortPorts() {
 func (m *Model) updateTableRows() {
 	// Clear rows first to prevent index out of range panic when column count changes
 	m.table.SetRows([]table.Row{})
-	
-	// Update columns to include Uptime
-	columns := []table.Column{
-		{Title: "Port", Width: 10},
-		{Title: "PID", Width: 10},
-		{Title: "Process", Width: 25},
-		{Title: "Uptime", Width: 15},
-		{Title: "Status", Width: 15},
+
+	// Update columns based on metrics toggle
+	var columns []table.Column
+	if m.showMetrics {
+		columns = []table.Column{
+			{Title: "✓", Width: 3},      // Selection indicator
+			{Title: "Port", Width: 10},
+			{Title: "PID", Width: 10},
+			{Title: "Process", Width: 20},
+			{Title: "HTTP", Width: 8},
+			{Title: "Latency", Width: 10},
+			{Title: "CPU%", Width: 8},
+			{Title: "Mem(MB)", Width: 10},
+			{Title: "Uptime", Width: 12},
+		}
+	} else {
+		columns = []table.Column{
+			{Title: "✓", Width: 3},      // Selection indicator
+			{Title: "Port", Width: 10},
+			{Title: "PID", Width: 10},
+			{Title: "Process", Width: 25},
+			{Title: "HTTP", Width: 8},
+			{Title: "Uptime", Width: 15},
+			{Title: "Status", Width: 10},
+		}
 	}
 	m.table.SetColumns(columns)
 
 	rows := []table.Row{}
 	for _, p := range m.ports {
 		uptime := history.FormatUptime(m.historyTracker.GetUptime(p.Port))
-		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", p.Port),
-			fmt.Sprintf("%d", p.PID),
-			p.Process,
-			uptime,
-			p.Status,
-		})
+		
+		// Selection indicator
+		selectIndicator := " "
+		if p.Selected {
+			selectIndicator = "✓"
+		}
+		
+		// Format port with color based on port type
+		portStr := fmt.Sprintf("%d", p.Port)
+		
+		// HTTP status display
+		httpStatus := "-"
+		if p.HTTPStatus > 0 {
+			httpStatus = fmt.Sprintf("%d", p.HTTPStatus)
+		}
+		
+		// Latency display
+		latency := "-"
+		if p.Latency > 0 {
+			latency = fmt.Sprintf("%dms", p.Latency.Milliseconds())
+		}
+		
+		if m.showMetrics {
+			rows = append(rows, table.Row{
+				selectIndicator,
+				portStr,
+				fmt.Sprintf("%d", p.PID),
+				p.Process,
+				httpStatus,
+				latency,
+				fmt.Sprintf("%.1f", p.CPUPercent),
+				fmt.Sprintf("%.1f", p.MemoryMB),
+				uptime,
+			})
+		} else {
+			rows = append(rows, table.Row{
+				selectIndicator,
+				portStr,
+				fmt.Sprintf("%d", p.PID),
+				p.Process,
+				httpStatus,
+				uptime,
+				p.Status,
+			})
+		}
 	}
 	m.table.SetRows(rows)
 }
@@ -408,7 +596,7 @@ func (m Model) getSortIndicator() string {
 func (m *Model) updateHistoryTable() {
 	// Clear rows first to prevent index out of range panic when column count changes
 	m.table.SetRows([]table.Row{})
-	
+
 	// Update columns for history view
 	columns := []table.Column{
 		{Title: "Port", Width: 10},
@@ -475,4 +663,3 @@ func exportData(ports []scanner.PortInfo) tea.Cmd {
 		return exportSuccessMsg{path: paths}
 	}
 }
-
