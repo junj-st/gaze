@@ -4,8 +4,6 @@
 
 Gaze is a real-time dashboard for your local development environment. It solves the everyday annoyance of hung ports, ghost processes, and "address already in use" errors by giving you instant visibility and control over your local network sockets—all without leaving your terminal.
 
-
-
 ##  Why Gaze?
 
 Ever encountered this?
@@ -200,7 +198,6 @@ Tracked: 15 ports • Active: 4 • Events: 32
 Exports are saved to your home directory:
 - `gaze-export-2026-02-22-16-38-42.json` - Full snapshot with statistics
 - `gaze-export-2026-02-22-16-38-42.csv` - Spreadsheet-friendly format
-
 
 ##  Features
 
