@@ -357,6 +357,9 @@ func (m *Model) sortPorts() {
 
 // updateTableRows updates the table with current port data
 func (m *Model) updateTableRows() {
+	// Clear rows first to prevent index out of range panic when column count changes
+	m.table.SetRows([]table.Row{})
+	
 	// Update columns to include Uptime
 	columns := []table.Column{
 		{Title: "Port", Width: 10},
@@ -403,6 +406,9 @@ func (m Model) getSortIndicator() string {
 
 // updateHistoryTable updates the table with port history data
 func (m *Model) updateHistoryTable() {
+	// Clear rows first to prevent index out of range panic when column count changes
+	m.table.SetRows([]table.Row{})
+	
 	// Update columns for history view
 	columns := []table.Column{
 		{Title: "Port", Width: 10},
