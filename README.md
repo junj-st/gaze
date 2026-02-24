@@ -4,27 +4,6 @@
 
 Gaze is a real-time dashboard for your local development environment. It solves the everyday annoyance of hung ports, ghost processes, and "address already in use" errors by giving you instant visibility and control over your local network sockets—all without leaving your terminal.
 
-##  Features
-
-### Core Features
--  **Auto-Discovery**: Continuously scans your local ports to detect active connections
--  **Process Identification**: Maps each port to its process name and PID
--  **Port History Tracking**: Tracks when ports open/close and shows uptime for each active port
--  **History View**: Browse complete port lifecycle with timestamps and event history
--  **Export Functionality**: Export port snapshots to JSON and CSV for auditing or sharing
--  **Flexible Sorting**: Sort by Port, PID, or Process name with ascending/descending order
--  **Kill Switch**: Terminate hung processes with a single keystroke
--  **Beautiful UI**: Modern terminal interface with colors and smooth interactions
--  **Real-time Updates**: Auto-refreshes every 3 seconds to keep you in sync
--  **Cross-Platform**: Works on macOS, Linux, and Windows
-
-### New Features (v2.0 - Branch: newversion) 🎉
--  **HTTP Health Checking**: Automatically pings web ports to check response time and status codes
--  **Color-Coded Ports**: Visual distinction between well-known (0-1023), registered (1024-49151), and dynamic ports (49152-65535)
--  **Resource Monitoring**: View CPU % and Memory usage for each process
--  **Multi-Process Kill**: Select multiple ports with Space and kill them all at once with `k`
--  **Metrics Toggle**: Press `m` to show/hide CPU and memory metrics
-
 ##  Why Gaze?
 
 Ever encountered this?
@@ -220,24 +199,22 @@ Exports are saved to your home directory:
 - `gaze-export-2026-02-22-16-38-42.json` - Full snapshot with statistics
 - `gaze-export-2026-02-22-16-38-42.csv` - Spreadsheet-friendly format
 
-##  Roadmap
-
-### ✅ Completed (v2.0 - newversion branch)
-- [x] Flexible column sorting by Port/PID/Process
-- [x] Port history tracking with uptime display
-- [x] Export port snapshots to JSON/CSV
-- [x] HTTP health checking with latency measurement
-- [x] Color-coded port types (well-known/registered/dynamic)
-- [x] Resource monitoring (CPU/Memory usage)
-- [x] Multi-process kill selection
-
-### 🚀 Upcoming
-- [ ] Port filtering and search functionality
-- [ ] Configuration file for custom port lists
-- [ ] Docker container detection
-- [ ] Alert system for port changes
-- [ ] Web dashboard mode
-- [ ] Plugin system for extensions
+### Core Features
+-  **Auto-Discovery**: Continuously scans your local ports to detect active connections
+-  **Process Identification**: Maps each port to its process name and PID
+-  **Port History Tracking**: Tracks when ports open/close and shows uptime for each active port
+-  **History View**: Browse complete port lifecycle with timestamps and event history
+-  **Export Functionality**: Export port snapshots to JSON and CSV for auditing or sharing
+-  **Flexible Sorting**: Sort by Port, PID, or Process name with ascending/descending order
+-  **Kill Switch**: Terminate hung processes with a single keystroke
+-  **Beautiful UI**: Modern terminal interface with colors and smooth interactions
+-  **Real-time Updates**: Auto-refreshes every 3 seconds to keep you in sync
+-  **Cross-Platform**: Works on macOS, Linux, and Windows
+-  **HTTP Health Checking**: Automatically pings web ports to check response time and status codes
+-  **Color-Coded Ports**: Visual distinction between well-known (0-1023), registered (1024-49151), and dynamic ports (49152-65535)
+-  **Resource Monitoring**: View CPU % and Memory usage for each process
+-  **Multi-Process Kill**: Select multiple ports with Space and kill them all at once with `k`
+-  **Metrics Toggle**: Press `m` to show/hide CPU and memory metrics
 
 ## License
 
