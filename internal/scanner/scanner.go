@@ -32,11 +32,11 @@ type PortInfo struct {
 
 // DockerContainer represents a Docker container
 type DockerContainer struct {
-	ID      string   `json:"ID"`
-	Name    string   `json:"Names"`
-	Image   string   `json:"Image"`
-	Ports   string   `json:"Ports"`
-	Status  string   `json:"Status"`
+	ID     string `json:"ID"`
+	Name   string `json:"Names"`
+	Image  string `json:"Image"`
+	Ports  string `json:"Ports"`
+	Status string `json:"Status"`
 }
 
 // ScanPorts scans for all active network connections
@@ -62,7 +62,7 @@ func ScanPorts() ([]PortInfo, error) {
 			var cpuPercent, memoryMB float64
 			var containerID, containerName string
 			var isContainer bool
-			
+
 			if conn.Pid != 0 {
 				p, err := process.NewProcess(conn.Pid)
 				if err == nil {
@@ -73,7 +73,7 @@ func ScanPorts() ([]PortInfo, error) {
 					if err == nil {
 						memoryMB = float64(memInfo.RSS) / 1024 / 1024
 					}
-					
+
 					// Check if process is in a Docker container
 					containerID, containerName, isContainer = getContainerInfo(conn.Pid)
 				}
@@ -219,7 +219,7 @@ func getContainerInfo(pid int32) (string, string, bool) {
 
 	// Get container name from Docker
 	containerName := getContainerNameByID(containerID)
-	
+
 	// Return short container ID (first 12 chars)
 	shortID := containerID
 	if len(containerID) > 12 {
