@@ -2,10 +2,9 @@ package scanner
 
 import (
 	"fmt"
+	"net/http"
 	"os"
-	"os/exec"
-	"strconv"
-	"strings"
+	"time"
 
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
@@ -13,10 +12,15 @@ import (
 
 // PortInfo represents information about a listening port
 type PortInfo struct {
-	Port    int
-	PID     int32
-	Process string
-	Status  string
+	Port       int
+	PID        int32
+	Process    string
+	Status     string
+	HTTPStatus int           // HTTP response status code (0 if not checked)
+	Latency    time.Duration // Response latency
+	CPUPercent float64       // CPU usage percentage
+	MemoryMB   float64       // Memory usage in MB
+	Selected   bool          // For multi-select mode
 }
 
 // ScanPorts scans for all active network connections
@@ -39,19 +43,37 @@ func ScanPorts() ([]PortInfo, error) {
 			}
 
 			pName := "Unknown"
+			var cpuPercent, memoryMB float64
 			if conn.Pid != 0 {
 				p, err := process.NewProcess(conn.Pid)
 				if err == nil {
 					pName, _ = p.Name()
+					// Get CPU and memory usage
+					cpuPercent, _ = p.CPUPercent()
+					memInfo, err := p.MemoryInfo()
+					if err == nil {
+						memoryMB = float64(memInfo.RSS) / 1024 / 1024
+					}
 				}
 			}
 
-			portMap[port] = PortInfo{
-				Port:    port,
-				PID:     conn.Pid,
-				Process: pName,
-				Status:  conn.Status,
+			portInfo := PortInfo{
+				Port:       port,
+				PID:        conn.Pid,
+				Process:    pName,
+				Status:     conn.Status,
+				CPUPercent: cpuPercent,
+				MemoryMB:   memoryMB,
 			}
+
+			// Check HTTP health for common web ports
+			if isWebPort(port) {
+				statusCode, latency := checkHTTPHealth(port)
+				portInfo.HTTPStatus = statusCode
+				portInfo.Latency = latency
+			}
+
+			portMap[port] = portInfo
 		}
 	}
 
@@ -102,20 +124,56 @@ func GetProcessName(pid int32) string {
 	return name
 }
 
-// CheckPortHealth sends a basic HTTP request to check if a port is responsive
-func CheckPortHealth(port int) (int, error) {
-	// Simple implementation using curl
-	cmd := exec.Command("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-		fmt.Sprintf("http://localhost:%d", port), "--connect-timeout", "1")
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, err
+// GetPortType categorizes a port into well-known, registered, or dynamic
+func GetPortType(port int) string {
+	if port < 1024 {
+		return "well-known"
+	} else if port < 49152 {
+		return "registered"
+	}
+	return "dynamic"
+}
+
+// isWebPort checks if a port is commonly used for web services
+func isWebPort(port int) bool {
+	commonWebPorts := []int{80, 443, 8080, 8000, 8443, 3000, 5000, 3001, 4200, 5173, 8888, 9000}
+	for _, p := range commonWebPorts {
+		if port == p {
+			return true
+		}
+	}
+	return false
+}
+
+// checkHTTPHealth performs HTTP health check with latency measurement
+func checkHTTPHealth(port int) (int, time.Duration) {
+	client := &http.Client{
+		Timeout: 1 * time.Second,
 	}
 
-	statusCode, err := strconv.Atoi(strings.TrimSpace(string(output)))
-	if err != nil {
-		return 0, err
-	}
+	url := fmt.Sprintf("http://localhost:%d", port)
+	start := time.Now()
+	resp, err := client.Get(url)
+	latency := time.Since(start)
 
-	return statusCode, nil
+	if err != nil {
+		return 0, 0
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode, latency
+}
+
+// KillMultipleProcesses kills multiple processes by their PIDs
+func KillMultipleProcesses(pids []int32) error {
+	var errors []error
+	for _, pid := range pids {
+		if err := KillProcess(pid); err != nil {
+			errors = append(errors, err)
+		}
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to kill %d processes", len(errors))
+	}
+	return nil
 }

@@ -67,7 +67,27 @@ var (
 	eventCloseStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FF5555")).
 			Bold(true)
-)
+	// HTTP status styles
+	httpOKStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00FF00"))
+
+	httpErrorStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FF5555"))
+
+	// Port type styles
+	wellKnownPortStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FF6B6B")).
+		Bold(true)
+
+	registeredPortStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#4ECDC4"))
+
+	dynamicPortStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#95E1D3"))
+
+	// Metrics styles
+	metricsStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFA500")))
 
 type tickMsg time.Time
 type scanResultMsg []scanner.PortInfo
@@ -105,6 +125,7 @@ type Model struct {
 	viewMode      ViewMode
 	exportMsg     string
 	exportMsgTime time.Time
+	showMetrics   bool // Toggle for showing CPU/Memory metrics
 }
 
 // InitialModel creates the initial model
@@ -113,7 +134,9 @@ func InitialModel() Model {
 		{Title: "Port", Width: 10},
 		{Title: "PID", Width: 10},
 		{Title: "Process", Width: 25},
-		{Title: "Status", Width: 15},
+		{Title: "HTTP", Width: 8},
+		{Title: "Uptime", Width: 15},
+		{Title: "Status", Width: 10},
 	}
 
 	t := table.New(
@@ -145,8 +168,7 @@ func InitialModel() Model {
 		sortColumn:     SortByPort,
 		sortAscending:  true,
 		historyTracker: history.NewTracker(1000, 500), // Track last 1000 events, 500 ports
-		viewMode:       ViewPorts,
-	}
+		viewMode:       ViewPorts,		showMetrics:    false,	}
 }
 
 // Init initializes the model
@@ -204,6 +226,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.updateHistoryTable()
 			} else {
 				m.viewMode = ViewPorts
+				m.updateTableRows()
+			}
+
+		case "m", "M":
+			// Toggle metrics display
+			m.showMetrics = !m.showMetrics
+			if m.viewMode == ViewPorts {
 				m.updateTableRows()
 			}
 
@@ -308,7 +337,7 @@ func (m Model) View() string {
 
 	// Help text
 	if m.viewMode == ViewPorts {
-		help := "↑/↓: Navigate • s: Sort • a: Order • e: Export • h: History • k: Kill • r: Refresh • q: Quit"
+		help := "↑/↓: Navigate • s: Sort • a: Order • m: Metrics • e: Export • h: History • k: Kill • r: Refresh • q: Quit"
 		s += helpStyle.Render(help)
 	} else {
 		help := "↑/↓: Navigate • h: Back to Ports • e: Export • q: Quit"
@@ -360,26 +389,68 @@ func (m *Model) updateTableRows() {
 	// Clear rows first to prevent index out of range panic when column count changes
 	m.table.SetRows([]table.Row{})
 	
-	// Update columns to include Uptime
-	columns := []table.Column{
-		{Title: "Port", Width: 10},
-		{Title: "PID", Width: 10},
-		{Title: "Process", Width: 25},
-		{Title: "Uptime", Width: 15},
-		{Title: "Status", Width: 15},
+	// Update columns based on metrics toggle
+	var columns []table.Column
+	if m.showMetrics {
+		columns = []table.Column{
+			{Title: "Port", Width: 10},
+			{Title: "PID", Width: 10},
+			{Title: "Process", Width: 20},
+			{Title: "HTTP", Width: 8},
+			{Title: "Latency", Width: 10},
+			{Title: "CPU%", Width: 8},
+			{Title: "Mem(MB)", Width: 10},
+			{Title: "Uptime", Width: 12},
+		}
+	} else {
+		columns = []table.Column{
+			{Title: "Port", Width: 10},
+			{Title: "PID", Width: 10},
+			{Title: "Process", Width: 25},
+			{Title: "HTTP", Width: 8},
+			{Title: "Uptime", Width: 15},
+			{Title: "Status", Width: 10},
+		}
 	}
 	m.table.SetColumns(columns)
 
 	rows := []table.Row{}
 	for _, p := range m.ports {
 		uptime := history.FormatUptime(m.historyTracker.GetUptime(p.Port))
-		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", p.Port),
-			fmt.Sprintf("%d", p.PID),
-			p.Process,
-			uptime,
-			p.Status,
-		})
+		
+		// HTTP status display
+		httpStatus := "-"
+		if p.HTTPStatus > 0 {
+			httpStatus = fmt.Sprintf("%d", p.HTTPStatus)
+		}
+		
+		// Latency display
+		latency := "-"
+		if p.Latency > 0 {
+			latency = fmt.Sprintf("%dms", p.Latency.Milliseconds())
+		}
+		
+		if m.showMetrics {
+			rows = append(rows, table.Row{
+				fmt.Sprintf("%d", p.Port),
+				fmt.Sprintf("%d", p.PID),
+				p.Process,
+				httpStatus,
+				latency,
+				fmt.Sprintf("%.1f", p.CPUPercent),
+				fmt.Sprintf("%.1f", p.MemoryMB),
+				uptime,
+			})
+		} else {
+			rows = append(rows, table.Row{
+				fmt.Sprintf("%d", p.Port),
+				fmt.Sprintf("%d", p.PID),
+				p.Process,
+				httpStatus,
+				uptime,
+				p.Status,
+			})
+		}
 	}
 	m.table.SetRows(rows)
 }
