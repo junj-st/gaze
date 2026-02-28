@@ -37,7 +37,7 @@ var (
 			Foreground(lipgloss.Color("#00D9FF"))
 
 	pidStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888888"))
+			Foreground(lipgloss.Color("#888888"))
 
 	processStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#88FF88"))
@@ -69,25 +69,31 @@ var (
 			Bold(true)
 	// HTTP status styles
 	httpOKStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00FF00"))
+			Foreground(lipgloss.Color("#00FF00"))
 
 	httpErrorStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FF5555"))
+			Foreground(lipgloss.Color("#FF5555"))
 
 	// Port type styles
 	wellKnownPortStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FF6B6B")).
-		Bold(true)
+				Foreground(lipgloss.Color("#FF6B6B")).
+				Bold(true)
 
 	registeredPortStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#4ECDC4"))
+				Foreground(lipgloss.Color("#4ECDC4"))
 
 	dynamicPortStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#95E1D3"))
+				Foreground(lipgloss.Color("#95E1D3"))
 
 	// Metrics styles
 	metricsStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFA500")))
+			Foreground(lipgloss.Color("#FFA500"))
+
+	// Docker styles
+	dockerStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#2496ED")).
+			Bold(true)
+)
 
 type tickMsg time.Time
 type scanResultMsg []scanner.PortInfo
@@ -113,19 +119,20 @@ const (
 
 // Model represents the application state
 type Model struct {
-	ports         []scanner.PortInfo
-	cursor        int
-	table         table.Model
-	err           error
-	lastScan      time.Time
-	isScanning    bool
-	sortColumn    SortColumn
-	sortAscending bool
+	ports          []scanner.PortInfo
+	cursor         int
+	table          table.Model
+	err            error
+	lastScan       time.Time
+	isScanning     bool
+	sortColumn     SortColumn
+	sortAscending  bool
 	historyTracker *history.Tracker
-	viewMode      ViewMode
-	exportMsg     string
-	exportMsgTime time.Time
-	showMetrics   bool // Toggle for showing CPU/Memory metrics
+	viewMode       ViewMode
+	exportMsg      string
+	exportMsgTime  time.Time
+	showMetrics    bool // Toggle for showing CPU/Memory metrics
+	showDocker     bool // Toggle for showing Docker container info
 }
 
 // InitialModel creates the initial model
@@ -133,9 +140,10 @@ func InitialModel() Model {
 	columns := []table.Column{
 		{Title: "Port", Width: 10},
 		{Title: "PID", Width: 10},
-		{Title: "Process", Width: 25},
+		{Title: "Process", Width: 20},
+		{Title: "Docker", Width: 15},
 		{Title: "HTTP", Width: 8},
-		{Title: "Uptime", Width: 15},
+		{Title: "Uptime", Width: 12},
 		{Title: "Status", Width: 10},
 	}
 
@@ -168,7 +176,7 @@ func InitialModel() Model {
 		sortColumn:     SortByPort,
 		sortAscending:  true,
 		historyTracker: history.NewTracker(1000, 500), // Track last 1000 events, 500 ports
-		viewMode:       ViewPorts,		showMetrics:    false,	}
+		viewMode:       ViewPorts, showMetrics: false, showDocker: true}
 }
 
 // Init initializes the model
@@ -234,6 +242,49 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showMetrics = !m.showMetrics
 			if m.viewMode == ViewPorts {
 				m.updateTableRows()
+			}
+
+		case "d", "D":
+			// Toggle Docker info display
+			m.showDocker = !m.showDocker
+			if m.viewMode == ViewPorts {
+				m.updateTableRows()
+			}
+
+		case "x", "X":
+			// Stop Docker container
+			if len(m.ports) > 0 && m.table.Cursor() < len(m.ports) {
+				selectedPort := m.ports[m.table.Cursor()]
+				if selectedPort.IsContainer && selectedPort.ContainerID != "" {
+					err := scanner.StopContainer(selectedPort.ContainerID)
+					if err != nil {
+						m.err = fmt.Errorf("failed to stop container: %w", err)
+					} else {
+						m.exportMsg = fmt.Sprintf("Stopped container: %s", selectedPort.ContainerName)
+						m.exportMsgTime = time.Now()
+						return m, scanPorts()
+					}
+				} else {
+					m.err = fmt.Errorf("selected port is not in a container")
+				}
+			}
+
+		case "t", "T":
+			// Restart Docker container
+			if len(m.ports) > 0 && m.table.Cursor() < len(m.ports) {
+				selectedPort := m.ports[m.table.Cursor()]
+				if selectedPort.IsContainer && selectedPort.ContainerID != "" {
+					err := scanner.RestartContainer(selectedPort.ContainerID)
+					if err != nil {
+						m.err = fmt.Errorf("failed to restart container: %w", err)
+					} else {
+						m.exportMsg = fmt.Sprintf("Restarted container: %s", selectedPort.ContainerName)
+						m.exportMsgTime = time.Now()
+						return m, scanPorts()
+					}
+				} else {
+					m.err = fmt.Errorf("selected port is not in a container")
+				}
 			}
 
 		case "e", "E":
@@ -337,7 +388,7 @@ func (m Model) View() string {
 
 	// Help text
 	if m.viewMode == ViewPorts {
-		help := "↑/↓: Navigate • s: Sort • a: Order • m: Metrics • e: Export • h: History • k: Kill • r: Refresh • q: Quit"
+		help := "↑/↓: Navigate • s: Sort • a: Order • m: Metrics • d: Docker • e: Export • h: History • k: Kill • x: Stop • t: Restart • r: Refresh • q: Quit"
 		s += helpStyle.Render(help)
 	} else {
 		help := "↑/↓: Navigate • h: Back to Ports • e: Export • q: Quit"
@@ -388,27 +439,29 @@ func (m *Model) sortPorts() {
 func (m *Model) updateTableRows() {
 	// Clear rows first to prevent index out of range panic when column count changes
 	m.table.SetRows([]table.Row{})
-	
+
 	// Update columns based on metrics toggle
 	var columns []table.Column
 	if m.showMetrics {
 		columns = []table.Column{
 			{Title: "Port", Width: 10},
 			{Title: "PID", Width: 10},
-			{Title: "Process", Width: 20},
-			{Title: "HTTP", Width: 8},
-			{Title: "Latency", Width: 10},
-			{Title: "CPU%", Width: 8},
-			{Title: "Mem(MB)", Width: 10},
-			{Title: "Uptime", Width: 12},
+			{Title: "Process", Width: 18},
+			{Title: "Docker", Width: 12},
+			{Title: "HTTP", Width: 7},
+			{Title: "Latency", Width: 9},
+			{Title: "CPU%", Width: 7},
+			{Title: "Mem(MB)", Width: 9},
+			{Title: "Uptime", Width: 10},
 		}
 	} else {
 		columns = []table.Column{
 			{Title: "Port", Width: 10},
 			{Title: "PID", Width: 10},
-			{Title: "Process", Width: 25},
+			{Title: "Process", Width: 20},
+			{Title: "Docker", Width: 15},
 			{Title: "HTTP", Width: 8},
-			{Title: "Uptime", Width: 15},
+			{Title: "Uptime", Width: 12},
 			{Title: "Status", Width: 10},
 		}
 	}
@@ -417,24 +470,35 @@ func (m *Model) updateTableRows() {
 	rows := []table.Row{}
 	for _, p := range m.ports {
 		uptime := history.FormatUptime(m.historyTracker.GetUptime(p.Port))
-		
+
 		// HTTP status display
 		httpStatus := "-"
 		if p.HTTPStatus > 0 {
 			httpStatus = fmt.Sprintf("%d", p.HTTPStatus)
 		}
-		
+
 		// Latency display
 		latency := "-"
 		if p.Latency > 0 {
 			latency = fmt.Sprintf("%dms", p.Latency.Milliseconds())
 		}
-		
+
+		// Docker display
+		dockerInfo := "-"
+		if p.IsContainer && m.showDocker {
+			if p.ContainerName != "" {
+				dockerInfo = p.ContainerName
+			} else if p.ContainerID != "" {
+				dockerInfo = p.ContainerID[:8] // Show first 8 chars
+			}
+		}
+
 		if m.showMetrics {
 			rows = append(rows, table.Row{
 				fmt.Sprintf("%d", p.Port),
 				fmt.Sprintf("%d", p.PID),
 				p.Process,
+				dockerInfo,
 				httpStatus,
 				latency,
 				fmt.Sprintf("%.1f", p.CPUPercent),
@@ -446,6 +510,7 @@ func (m *Model) updateTableRows() {
 				fmt.Sprintf("%d", p.Port),
 				fmt.Sprintf("%d", p.PID),
 				p.Process,
+				dockerInfo,
 				httpStatus,
 				uptime,
 				p.Status,
@@ -479,7 +544,7 @@ func (m Model) getSortIndicator() string {
 func (m *Model) updateHistoryTable() {
 	// Clear rows first to prevent index out of range panic when column count changes
 	m.table.SetRows([]table.Row{})
-	
+
 	// Update columns for history view
 	columns := []table.Column{
 		{Title: "Port", Width: 10},
@@ -546,4 +611,3 @@ func exportData(ports []scanner.PortInfo) tea.Cmd {
 		return exportSuccessMsg{path: paths}
 	}
 }
-
